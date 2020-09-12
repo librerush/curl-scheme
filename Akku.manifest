@@ -1,0 +1,9 @@
+#!r6rs ; -*- mode: scheme; coding: utf-8 -*-
+(import (akku format manifest))
+
+(akku-package ("curl-scheme" "1.0.0-alpha.0")
+  (synopsis "HTTP client for Scheme")
+  (authors "Kozhabay Dias")
+  (license "MIT")
+  (depends ("r6rs-pffi" "^1.3.0") ("chez-srfi" ">=0.0.0-akku <1.0.0"))
+)
