@@ -4,12 +4,16 @@
 #!r6rs
 
 (library (curl-scheme)
-  (export http/get)
-  (import (rnrs)
+  (export http-request? make-http-request
+          http-request-method http-request-url http-request-body
+          http-response? make-http-response
+          http-response-status http-response-status-text
+          http-response-port
+          http/get)
+  (import (rnrs (6))
           (only (chezscheme)
                 put-bytevector
-                getenv
-                fx>)
+                getenv)
           (pffi))
 
   (define libcurl-object
@@ -27,8 +31,9 @@
   (define CURLOPT-WRITEFUNCTION 20011)
   (define CURLOPT-HTTPGET 80)
   (define CURLOPT-HEADER 23)
-
-
+  (define CURLINFO-LONG #x200000)
+  (define CURLINFO-RESPONSE-CODE (+ 2 CURLINFO-LONG))
+  
   (define %curl-global-init
     (foreign-procedure libcurl-object int curl_global_init (long)))
 
@@ -58,13 +63,19 @@
   (define %curl-easy-cleanup
     (foreign-procedure libcurl-object void curl_easy_cleanup (pointer)))
 
+  (define-record-type http-request
+    (fields method url body))
+
+  (define-record-type http-response
+    (fields status status-text port))
+  
   (define (http/get url)
     (define write-callback
       (c-callback int (pointer int int pointer)
                   (lambda (ptr size nmemb stream)
                     (let ((realsize (* size nmemb)))
                       (let loop ((i 0))
-                        (unless (fx> i realsize)
+                        (unless (fx>? i realsize)
                           #;(display (integer->char
                                     (pointer-ref-c-uint8 ptr i)))
                           (loop (fx+ i 1))))
