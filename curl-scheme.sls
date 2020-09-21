@@ -4,10 +4,8 @@
 #!r6rs
 
 (library (curl-scheme)
-  (export http-request? make-http-request
-          http-request-method http-request-url http-request-body
-          http-response? make-http-response
-          http-response-status http-response-status-text
+  (export http-response? make-http-response
+          http-response-status-code
           http-response-port
           http/get)
   (import (rnrs (6))
@@ -33,7 +31,7 @@
   (define CURLOPT-HEADER 23)
   (define CURLINFO-LONG #x200000)
   (define CURLINFO-RESPONSE-CODE (+ 2 CURLINFO-LONG))
-  
+
   (define %curl-global-init
     (foreign-procedure libcurl-object int curl_global_init (long)))
 
@@ -63,24 +61,26 @@
   (define %curl-easy-cleanup
     (foreign-procedure libcurl-object void curl_easy_cleanup (pointer)))
 
-  (define-record-type http-request
-    (fields method url body))
-
   (define-record-type http-response
-    (fields status status-text port))
-  
+    (fields status-code port))
+
   (define (http/get url)
+    (define bv #f)
     (define write-callback
       (c-callback int (pointer int int pointer)
                   (lambda (ptr size nmemb stream)
                     (let ((realsize (* size nmemb)))
+                      (when (> realsize 2048)
+                        ;; TODO: handle large data
+                        (error 'write-callback "Too large data" realsize))
+                      (set! bv (make-bytevector realsize))
                       (let loop ((i 0))
-                        (unless (fx>? i realsize)
-                          #;(display (integer->char
-                                    (pointer-ref-c-uint8 ptr i)))
+                        (unless (fx>=? i realsize)
+                          (bytevector-u8-set! bv i (pointer-ref-c-uint8 ptr i))
                           (loop (fx+ i 1))))
                       realsize))))
-    (let ((curl-handle (%curl-easy-init)))
+    (let ((curl-handle (%curl-easy-init))
+          (resp-ptr (bytevector->pointer (make-bytevector 4))))
       (%curl-easy-setopt/string curl-handle CURLOPT-URL url)
       (%curl-easy-setopt/long curl-handle CURLOPT-HEADER 1)
       (%curl-easy-setopt/long curl-handle CURLOPT-HTTPGET 1)
@@ -88,6 +88,10 @@
        curl-handle CURLOPT-WRITEFUNCTION write-callback)
       (%curl-easy-perform curl-handle)
       (free-c-callback write-callback)
-      (%curl-easy-cleanup curl-handle)))
+      (%curl-easy-getinfo curl-handle CURLINFO-RESPONSE-CODE resp-ptr)
+      (%curl-easy-cleanup curl-handle)
+      (make-http-response
+       (pointer-ref-c-long resp-ptr 0)
+       (utf8->string bv))))
 
 )
