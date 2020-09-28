@@ -39,4 +39,5 @@ before_script:
   #- eval "$(INSTALL_TARGET=$HOME/opt scheme-ci-master/install-scheme.sh $SCHEME)"
 
 script:
+  - ~/bin/akku install
   - ./tests/test-curl-scheme.sps
