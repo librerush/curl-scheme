@@ -34,9 +34,9 @@ before_script:
   - ~/bin/akku install
   - export SCHEME_LIBRARY_PATH=$PWD/.akku/lib
   # Install scheme-ci
-  - wget https://github.com/weinholt/scheme-ci/archive/master.zip -O scheme-ci-master.zip
-  - unzip scheme-ci-master.zip
-  - eval "$(INSTALL_TARGET=$HOME/opt scheme-ci-master/install-scheme.sh $SCHEME)"
+  #- wget https://github.com/weinholt/scheme-ci/archive/master.zip -O scheme-ci-master.zip
+  #- unzip scheme-ci-master.zip
+  #- eval "$(INSTALL_TARGET=$HOME/opt scheme-ci-master/install-scheme.sh $SCHEME)"
 
 script:
   - ./tests/test-curl-scheme.sps
