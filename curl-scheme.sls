@@ -9,9 +9,9 @@
           http-response-headers
           http-response-port
           http/get
-          ;; low level
-          header-string->key-value)
+          )
   (import (rnrs (6))
+          (curl-scheme private)
           (only (chezscheme)
                 put-bytevector
                 getenv)
@@ -70,25 +70,14 @@
   (define-record-type http-response
     (fields status-code headers port))
 
-  ;; Converts "key: value\r\n" to '("key" . "value")
-  (define (header-string->key-value s)
-    (let ((reg (regexp-partition
-                '(= 1 (: (* whitespace) ":" (* whitespace))) s)))
-      (if (string=? s (car reg))
-          #f
-          (cons (car reg)
-                (apply string-append
-                       (cddr reg))))))
-
   (define (http/get url)
     (define bv #f)
-    (define hdrs-hm (make-hashtable string-hash
-                                    string=?))
+    (define hdrs-hm '())
     (define write-callback
       (c-callback int (pointer int int pointer)
                   (lambda (ptr size nmemb stream)
                     (let ((realsize (* size nmemb)))
-                      (when (> realsize 4096)
+                      (when (> realsize (expt 2 16))
                         ;; TODO: handle large data
                         (error 'write-callback "Too large data" realsize))
                       (set! bv (make-bytevector realsize))
@@ -112,8 +101,7 @@
                       (let ((key-val (header-string->key-value
                                       (utf8->string tmp-bv))))
                         (when key-val
-                          (hashtable-set!
-                           hdrs-hm (car key-val) (cdr key-val))))
+                          (set! hdrs-hm (cons key-val hdrs-hm))))
                       (+ realsize 2)))))
     (let ((curl-handle (%curl-easy-init))
           (resp-ptr (bytevector->pointer (make-bytevector 4))))
