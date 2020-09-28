@@ -4,13 +4,14 @@ env:
     - SCHEME="ChezScheme_master"
 
 sudo: false
-# dist: trusty
+dist: bionic
 
 addons:
   apt:
     packages:
       - chezscheme
-
+      - libcurl4
+      
 language: c
 
 cache:
