@@ -3,7 +3,7 @@ env:
   matrix:
     - SCHEME="ChezScheme_master"
     - LIBCURL_SO="/usr/lib/x86_64-linux-gnu/libcurl.so.4"
-    
+
 sudo: false
 dist: bionic
 
@@ -12,7 +12,7 @@ addons:
     packages:
       - chezscheme
       - libcurl4
-      
+
 language: c
 
 cache:
@@ -39,5 +39,5 @@ before_script:
   #- eval "$(INSTALL_TARGET=$HOME/opt scheme-ci-master/install-scheme.sh $SCHEME)"
 
 script:
-  - ~/bin/akku install
+  - ./.akku/env
   - ./tests/test-curl-scheme.sps
