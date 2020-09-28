@@ -2,7 +2,8 @@
 env:
   matrix:
     - SCHEME="ChezScheme_master"
-
+    - LIBCURL_SO="/usr/lib/x86_64-linux-gnu/libcurl.so.4"
+    
 sudo: false
 dist: bionic
 
