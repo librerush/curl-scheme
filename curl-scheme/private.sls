@@ -4,7 +4,8 @@
 #!r6rs
 
 (library (curl-scheme private)
-  (export header-string->key-value)
+  (export header-string->key-value
+          bytevector-append)
   (import (rnrs (6))
           (srfi :115))
 
@@ -17,4 +18,12 @@
           (cons (car reg)
                 (apply string-append
                        (cddr reg))))))
+
+  (define (bytevector-append bv1 bv2)
+    (let* ((len1 (bytevector-length bv1))
+           (len2 (bytevector-length bv2))
+           (bv (make-bytevector (+ len1 len2))))
+      (bytevector-copy! bv1 0 bv 0 len1)
+      (bytevector-copy! bv2 0 bv len1 len2)
+      bv))
 )

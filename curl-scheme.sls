@@ -13,7 +13,6 @@
   (import (rnrs (6))
           (curl-scheme private)
           (only (chezscheme)
-                put-bytevector
                 getenv)
           (srfi :115)
           (pffi))
@@ -71,13 +70,14 @@
     (fields status-code headers port))
 
   (define (http/get url)
-    (define bv #f)
+    (define bv-data (make-bytevector 0))
     (define hdrs-hm '())
     (define write-callback
       (c-callback int (pointer int int pointer)
                   (lambda (ptr size nmemb stream)
-                    (let ((realsize (* size nmemb)))
-                      (when (> realsize (expt 2 16))
+                    (let* ((realsize (* size nmemb))
+                           (bv #f))
+                      (when (> realsize (expt 2 27)) ; ~100K
                         ;; TODO: handle large data
                         (error 'write-callback "Too large data" realsize))
                       (set! bv (make-bytevector realsize))
@@ -86,6 +86,7 @@
                           (bytevector-u8-set! bv i
                                               (pointer-ref-c-uint8 ptr i))
                           (loop (fx+ i 1))))
+                      (set! bv-data (bytevector-append bv-data bv))
                       realsize))))
     (define header-callback
       (c-callback int (pointer int int pointer)
@@ -119,6 +120,6 @@
       (make-http-response
        (pointer-ref-c-long resp-ptr 0)
        hdrs-hm
-       (utf8->string bv))))
+       (utf8->string bv-data))))
 
 )
