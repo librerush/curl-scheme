@@ -77,9 +77,9 @@
                   (lambda (ptr size nmemb stream)
                     (let* ((realsize (* size nmemb))
                            (bv #f))
-                      (when (> realsize (expt 2 27)) ; ~100K
-                        ;; TODO: handle large data
-                        (error 'write-callback "Too large data" realsize))
+                      (when (> (bytevector-length bv-data) (expt 2 26))
+                        (error 'write-callback "Too large data"
+                               (bytevector-length bv-data)))
                       (set! bv (make-bytevector realsize))
                       (let loop ((i 0))
                         (unless (fx>=? i realsize)
