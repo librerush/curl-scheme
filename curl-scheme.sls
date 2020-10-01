@@ -9,7 +9,7 @@
           http-response-headers
           http-response-port
           http/get
-          )
+          json-response?)
   (import (rnrs (6))
           (curl-scheme private)
           (only (chezscheme)
@@ -69,6 +69,14 @@
   (define-record-type http-response
     (fields status-code headers port))
 
+  (define (json-response? resp)
+    (let* ((resp-headers (http-response-headers resp))
+           (content-type (assoc "content-type" resp-headers)))
+      (and content-type
+           (regexp-matches?
+            '(+ bos "application/json" (* any))
+            (cdr content-type)))))
+
   (define (http/get url)
     (define bv-data (make-bytevector 0))
     (define hdrs-hm '())
@@ -120,6 +128,6 @@
       (make-http-response
        (pointer-ref-c-long resp-ptr 0)
        hdrs-hm
-       (utf8->string bv-data))))
+       bv-data)))
 
 )

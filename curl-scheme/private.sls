@@ -4,8 +4,8 @@
 #!r6rs
 
 (library (curl-scheme private)
-  (export header-string->key-value
-          bytevector-append)
+  (export bytevector-append
+          header-string->key-value)
   (import (rnrs (6))
           (srfi :115))
 
