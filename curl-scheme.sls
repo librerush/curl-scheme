@@ -37,6 +37,14 @@
   (define CURLINFO-LONG #x200000)
   (define CURLINFO-RESPONSE-CODE (+ 2 CURLINFO-LONG))
 
+  (define-syntax check-call
+    (syntax-rules ()
+      ((_ proc args ...)
+       (let ((return-val (proc args ...)))
+         (unless (equal? CURLE-OK return-val)
+           (error 'proc "Non-zero return value" return-val))
+         return-val))))
+
   (define %curl-global-init
     (foreign-procedure libcurl-object int curl_global_init (long)))
 
@@ -79,7 +87,7 @@
 
   (define (http/get url)
     (define bv-data (make-bytevector 0))
-    (define hdrs-hm '())
+    (define hdrs-alist '())
     (define write-callback
       (c-callback int (pointer int int pointer)
                   (lambda (ptr size nmemb stream)
@@ -110,24 +118,25 @@
                       (let ((key-val (header-string->key-value
                                       (utf8->string tmp-bv))))
                         (when key-val
-                          (set! hdrs-hm (cons key-val hdrs-hm))))
+                          (set! hdrs-alist (cons key-val hdrs-alist))))
                       (+ realsize 2)))))
     (let ((curl-handle (%curl-easy-init))
           (resp-ptr (bytevector->pointer (make-bytevector 4))))
-      (%curl-easy-setopt/string curl-handle CURLOPT-URL url)
-      (%curl-easy-setopt/long curl-handle CURLOPT-HTTPGET 1)
-      (%curl-easy-setopt/callback
-       curl-handle CURLOPT-HEADERFUNCTION header-callback)
-      (%curl-easy-setopt/callback
-       curl-handle CURLOPT-WRITEFUNCTION write-callback)
-      (%curl-easy-perform curl-handle)
+      (check-call %curl-easy-setopt/string curl-handle CURLOPT-URL url)
+      (check-call %curl-easy-setopt/long curl-handle CURLOPT-HTTPGET 1)
+      (check-call %curl-easy-setopt/callback
+                  curl-handle CURLOPT-HEADERFUNCTION header-callback)
+      (check-call %curl-easy-setopt/callback
+                  curl-handle CURLOPT-WRITEFUNCTION write-callback)
+      (check-call %curl-easy-perform curl-handle)
       (free-c-callback header-callback)
       (free-c-callback write-callback)
-      (%curl-easy-getinfo curl-handle CURLINFO-RESPONSE-CODE resp-ptr)
+      (check-call %curl-easy-getinfo
+                  curl-handle CURLINFO-RESPONSE-CODE resp-ptr)
       (%curl-easy-cleanup curl-handle)
       (make-http-response
        (pointer-ref-c-long resp-ptr 0)
-       hdrs-hm
+       hdrs-alist
        bv-data)))
 
 )
