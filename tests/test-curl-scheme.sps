@@ -56,14 +56,24 @@
 
 (test-begin "http/get")
 
-(define resp (http/get "https://httpbin.org/get"))
+(define get-resp (http/get "https://httpbin.org/get"))
 
 (test-equal 'http/get-1
   200
-  (http-response-status-code resp))
+  (http-response-status-code get-resp))
 
-(test-assert 'http/get-2
+#;(test-assert 'http/get-2
   (json-response? resp))
+
+(test-end)
+
+(test-begin "http/post")
+
+(define post-resp (http/post "https://httpbin.org/post"))
+
+(test-equal 'http/post-1
+  200
+  (http-response-status-code post-resp))
 
 (test-end)
 
