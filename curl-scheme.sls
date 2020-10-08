@@ -9,6 +9,7 @@
           http-response-headers
           http-response-port
           http/get
+          http/post
           json-response?)
   (import (rnrs (6))
           (curl-scheme private)
@@ -31,6 +32,9 @@
   (define CURLOPT-URL 10002)
   (define CURLOPT-WRITEFUNCTION 20011)
   (define CURLOPT-HTTPGET 80)
+  (define CURLOPT-POST 47)
+  (define CURLOPT-POSTFIELDSIZE 60)
+  (define CURLOPT-POSTFIELDS 10015)
   (define CURLOPT-HEADER 23)
   (define CURLOPT-HEADERDATA 10029)
   (define CURLOPT-HEADERFUNCTION 20079)
@@ -85,58 +89,87 @@
             '(+ bos "application/json" (* any))
             (cdr content-type)))))
 
-  (define (http/get url)
-    (define bv-data (make-bytevector 0))
-    (define hdrs-alist '())
-    (define write-callback
-      (c-callback int (pointer int int pointer)
-                  (lambda (ptr size nmemb stream)
-                    (let* ((realsize (* size nmemb))
-                           (bv #f))
-                      (when (> (bytevector-length bv-data) (expt 2 26))
-                        (error 'write-callback "Too large data"
-                               (bytevector-length bv-data)))
-                      (set! bv (make-bytevector realsize))
-                      (let loop ((i 0))
-                        (unless (fx>=? i realsize)
-                          (bytevector-u8-set! bv i
-                                              (pointer-ref-c-uint8 ptr i))
-                          (loop (fx+ i 1))))
-                      (set! bv-data (bytevector-append bv-data bv))
-                      realsize))))
-    (define header-callback
-      (c-callback int (pointer int int pointer)
-                  (lambda (ptr size nmemb stream)
-                    (let* ((realsize (- (* size nmemb) 2)) ; subtract CRLF
-                           (tmp-bv (make-bytevector realsize)))
-                      (let loop ((i 0))
-                        (unless (fx>=? i realsize)
-                          (bytevector-u8-set!
-                           tmp-bv i
-                           (pointer-ref-c-uint8 ptr i))
-                          (loop (fx+ i 1))))
-                      (let ((key-val (header-string->key-value
-                                      (utf8->string tmp-bv))))
-                        (when key-val
-                          (set! hdrs-alist (cons key-val hdrs-alist))))
-                      (+ realsize 2)))))
-    (let ((curl-handle (%curl-easy-init))
-          (resp-ptr (bytevector->pointer (make-bytevector 4))))
-      (check-call %curl-easy-setopt/string curl-handle CURLOPT-URL url)
-      (check-call %curl-easy-setopt/long curl-handle CURLOPT-HTTPGET 1)
-      (check-call %curl-easy-setopt/callback
-                  curl-handle CURLOPT-HEADERFUNCTION header-callback)
-      (check-call %curl-easy-setopt/callback
-                  curl-handle CURLOPT-WRITEFUNCTION write-callback)
-      (check-call %curl-easy-perform curl-handle)
-      (free-c-callback header-callback)
-      (free-c-callback write-callback)
-      (check-call %curl-easy-getinfo
-                  curl-handle CURLINFO-RESPONSE-CODE resp-ptr)
-      (%curl-easy-cleanup curl-handle)
-      (make-http-response
-       (pointer-ref-c-long resp-ptr 0)
-       hdrs-alist
-       bv-data)))
+  (define-syntax define-method
+    (syntax-rules ()
+      ((_ method-name)
+       (define method-name
+         (case-lambda
+           ((url)
+            (method-name url ""))
+           ((url data)
+            (define opt-code
+              (case 'method-name
+                ('http/get CURLOPT-HTTPGET)
+                ('http/post CURLOPT-POST)
+                (else (error 'opt-code "No such method" 'method-name))))
+            (define bv-data (make-bytevector 0))
+            (define hdrs-alist '())
+            (define write-callback
+              (c-callback int (pointer int int pointer)
+                          (lambda (ptr size nmemb stream)
+                            (let* ((realsize (* size nmemb))
+                                   (bv #f))
+                              (when (> (bytevector-length bv-data) (expt 2 26))
+                                (error 'write-callback "Too large data"
+                                       (bytevector-length bv-data)))
+                              (set! bv (make-bytevector realsize))
+                              (let loop ((i 0))
+                                (unless (fx>=? i realsize)
+                                  (bytevector-u8-set! bv i
+                                                      (pointer-ref-c-uint8 ptr i))
+                                  (loop (fx+ i 1))))
+                              (set! bv-data (bytevector-append bv-data bv))
+                              realsize))))
+            (define header-callback
+              (c-callback int (pointer int int pointer)
+                          (lambda (ptr size nmemb stream)
+                            (let* ((realsize (- (* size nmemb) 2)) ; subtract CRLF
+                                   (tmp-bv (make-bytevector realsize)))
+                              (let loop ((i 0))
+                                (unless (fx>=? i realsize)
+                                  (bytevector-u8-set!
+                                   tmp-bv i
+                                   (pointer-ref-c-uint8 ptr i))
+                                  (loop (fx+ i 1))))
+                              (let ((key-val (header-string->key-value
+                                              (utf8->string tmp-bv))))
+                                (when key-val
+                                  (set! hdrs-alist (cons key-val hdrs-alist))))
+                              (+ realsize 2)))))
+            (let ((curl-handle (%curl-easy-init))
+                  (resp-ptr (bytevector->pointer (make-bytevector 4))))
+              (check-call %curl-easy-setopt/string curl-handle CURLOPT-URL url)
+              (check-call %curl-easy-setopt/long curl-handle opt-code 1)
+              (when (eq? 'method-name 'http/post)
+                (let* ((data*
+                        (if (string? data)
+                            (string->utf8 data)
+                            data))
+                       (data-ptr
+                        (bytevector->pointer
+                         data*)))
+                  (check-call %curl-easy-setopt/long
+                              curl-handle CURLOPT-POSTFIELDSIZE
+                              (bytevector-length data*))
+                  (check-call %curl-easy-setopt/pointer
+                              curl-handle CURLOPT-POSTFIELDS
+                              data-ptr)))
+              (check-call %curl-easy-setopt/callback
+                          curl-handle CURLOPT-HEADERFUNCTION header-callback)
+              (check-call %curl-easy-setopt/callback
+                          curl-handle CURLOPT-WRITEFUNCTION write-callback)
+              (check-call %curl-easy-perform curl-handle)
+              (free-c-callback header-callback)
+              (free-c-callback write-callback)
+              (check-call %curl-easy-getinfo
+                          curl-handle CURLINFO-RESPONSE-CODE resp-ptr)
+              (%curl-easy-cleanup curl-handle)
+              (make-http-response
+               (pointer-ref-c-long resp-ptr 0)
+               hdrs-alist
+               bv-data))))))))
+
+  (define-method http/get)
+  (define-method http/post)
 
 )
