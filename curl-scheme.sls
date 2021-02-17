@@ -10,6 +10,9 @@
           http-response-port
           http/get
           http/post
+          http-open-connection
+          http-close-connection!
+          escape
           json-response?)
   (import (rnrs (6))
           (curl-scheme private)
@@ -77,6 +80,13 @@
     (foreign-procedure libcurl-object void curl_easy_reset (pointer)))
   (define %curl-easy-cleanup
     (foreign-procedure libcurl-object void curl_easy_cleanup (pointer)))
+  (define %curl-easy-escape
+    (foreign-procedure libcurl-object pointer curl_easy_escape (pointer pointer int)))
+  (define %curl-free
+    (foreign-procedure libcurl-object void curl_free (pointer)))
+
+  (define %str-len
+    (foreign-procedure libcurl-object int strlen (pointer)))
 
   (define-record-type http-response
     (fields status-code headers port))
@@ -94,9 +104,9 @@
       ((_ method-name)
        (define method-name
          (case-lambda
-           ((url)
-            (method-name url ""))
-           ((url data)
+           ((curl-handle url)
+            (method-name curl-handle url ""))
+           ((curl-handle url data)
             (define opt-code
               (case 'method-name
                 ('http/get CURLOPT-HTTPGET)
@@ -136,7 +146,7 @@
                                 (when key-val
                                   (set! hdrs-alist (cons key-val hdrs-alist))))
                               (+ realsize 2)))))
-            (let ((curl-handle (%curl-easy-init))
+            (let (;(curl-handle (%curl-easy-init))
                   (resp-ptr (bytevector->pointer (make-bytevector 4))))
               (check-call %curl-easy-setopt/string curl-handle CURLOPT-URL url)
               (check-call %curl-easy-setopt/long curl-handle opt-code 1)
@@ -163,7 +173,7 @@
               (free-c-callback write-callback)
               (check-call %curl-easy-getinfo
                           curl-handle CURLINFO-RESPONSE-CODE resp-ptr)
-              (%curl-easy-cleanup curl-handle)
+              ;(%curl-easy-cleanup curl-handle)
               (make-http-response
                (pointer-ref-c-long resp-ptr 0)
                hdrs-alist
@@ -172,4 +182,27 @@
   (define-method http/get)
   (define-method http/post)
 
+  (define (http-open-connection)
+    (%curl-easy-init))
+
+  (define (http-close-connection! connection)
+    (%curl-easy-cleanup connection))
+
+  ;; Encode url
+  (define (escape url-string)
+    (let* ((curl-handle (%curl-easy-init))
+           (url-bv (string->utf8 url-string))
+           (encoded-url-ptr (%curl-easy-escape
+                             curl-handle
+                             (bytevector->pointer
+                              url-bv)
+                             (bytevector-length
+                              url-bv)))
+           (encoded-url (utf8->string
+                         (pointer->bytevector
+                          encoded-url-ptr
+                          (%str-len encoded-url-ptr)))))
+      (%curl-free encoded-url-ptr)
+      (%curl-easy-cleanup curl-handle)
+      encoded-url))
 )
