@@ -1,3 +1,5 @@
 .akku
 *~
 set-env.sh
+*.env
+*.test
