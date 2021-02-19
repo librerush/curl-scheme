@@ -1,5 +1,5 @@
 ;; -*- mode: scheme; coding: utf-8 -*-
-;; Copyright (c) 2020 Kozhabay Dias
+;; Copyright (c) 2021 Kozhabay Dias
 ;; SPDX-License-Identifier: MIT
 #!r6rs
 
@@ -146,8 +146,7 @@
                                 (when key-val
                                   (set! hdrs-alist (cons key-val hdrs-alist))))
                               (+ realsize 2)))))
-            (let (;(curl-handle (%curl-easy-init))
-                  (resp-ptr (bytevector->pointer (make-bytevector 4))))
+            (let ((resp-ptr (bytevector->pointer (make-bytevector 4))))
               (check-call %curl-easy-setopt/string curl-handle CURLOPT-URL url)
               (check-call %curl-easy-setopt/long curl-handle opt-code 1)
               (when (eq? 'method-name 'http/post)
@@ -173,7 +172,6 @@
               (free-c-callback write-callback)
               (check-call %curl-easy-getinfo
                           curl-handle CURLINFO-RESPONSE-CODE resp-ptr)
-              ;(%curl-easy-cleanup curl-handle)
               (make-http-response
                (pointer-ref-c-long resp-ptr 0)
                hdrs-alist

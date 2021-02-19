@@ -1,6 +1,6 @@
 #!/usr/bin/env scheme-script
 ;; -*- mode: scheme; coding: utf-8 -*- !#
-;; Copyright (c) 2020 Kozhabay Dias
+;; Copyright (c) 2021 Kozhabay Dias
 ;; SPDX-License-Identifier: MIT
 #!r6rs
 
@@ -75,6 +75,18 @@
   (http-response-status-code post-resp))
 
 (http-close-connection! conn)
+(test-end)
+
+(test-begin "encoding")
+
+(test-equal 'escape-1
+  ""
+  (escape ""))
+
+(test-equal 'escape-2
+  "hello%2C%20world%21"
+  (escape "hello, world!"))
+
 (test-end)
 
 (exit (if (zero? (test-runner-fail-count (test-runner-get))) 0 1))
